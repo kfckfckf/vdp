@@ -4,7 +4,7 @@ vdp
 This is a C++ implementation of the distortion point detection method in the following paper:
 
 [Shuangming Chai](https://kfckfckf.github.io/), [Xiao-Ming Fu](http://staff.ustc.edu.cn/~fuxm), and [Ligang Liu](http://staff.ustc.edu.cn/~lgliu).
-Voting Distortion Points for Geometric Processing.
+Voting for Distortion Points in Geometric Processing.
 IEEE Transactions on Visualization and Computer Graphics, 2019.
 
 The code is written by Shuangming Chai using Microsoft Visual Studio 2017 with OpenMP.
