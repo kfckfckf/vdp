@@ -1,26 +1,24 @@
 #include "QEMSimplification.h"
 #include <iostream>
 
-QEMSimplification::QEMSimplification(const Mesh & m)
+QEMSimplification::QEMSimplification(const Mesh& m)
 	:mesh(m)
 {
 	mesh.add_property(vindex);
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		mesh.property(vindex, vh) = vh.idx();
 	}
 	mesh.add_property(QuaMat_f);
 	mesh.add_property(QuaMat_v);
 	mesh.add_property(QuaMat_e);
+	mesh.add_property(valence);
 	mesh.add_property(area_f);
 	mesh.add_property(new_point);
 	mesh.add_property(is_cal_e);
-	mesh.add_property(is_cal_he);
-	for (const auto & eh : mesh.edges())
+	for (const auto& eh : mesh.edges())
 	{
 		mesh.property(is_cal_e, eh) = false;
-		mesh.property(is_cal_he, mesh.halfedge_handle(eh, 0)) = false;
-		mesh.property(is_cal_he, mesh.halfedge_handle(eh, 1)) = false;
 	}
 }
 
@@ -33,179 +31,171 @@ void QEMSimplification::Simplify(int tar_num_v, double threshold)
 	InitialEdgeCost();
 	index_collapse_v_to_v.clear();
 	index_collapse_v_to_v.reserve(mesh.n_vertices());
-	auto counter = 0;
+	size_t counter = 0;
 	auto nv = mesh.n_vertices();
-	while (ChooseCollapasedEdge(threshold))
+	while (counter + tar_num_v < nv && ChooseCollapasedEdge(threshold))
 	{
-		counter++;
-		if (nv - counter <= tar_num_v)
-		{
-			mesh.garbage_collection(true);
-			break;
-		}
+		++counter;
 	}
-	std::cout << "[V, E, F] = [" << mesh.n_vertices() << ", " << mesh.n_edges() << ", " << mesh.n_faces() << "]" << std::endl;
-	std::cout << "Simplify is over!  the iter number is:  " << counter << std::endl;
+	mesh.garbage_collection(true);
 }
 
-int QEMSimplification::OriginalIndex(int currentid) const
+const std::vector<int>& QEMSimplification::OriginalIndex(void) const
 {
-	return mesh.property(vindex, mesh.vertex_handle(currentid));
+	return mesh.property(vindex).data_vector();
 }
 
-const Mesh & QEMSimplification::GetMesh(void) const
+const Mesh& QEMSimplification::GetMesh(void) const
 {
 	return mesh;
 }
 
 bool QEMSimplification::ChooseCollapasedEdge(double err_threshhold)
 {
-	EdgeQEM currentEdge;
-	int valence = 0;
-	do
+	while (!qpq.empty() && ((mesh.status(mesh.edge_handle(mesh.halfedge_handle(qpq.top().idx, 0))).deleted())
+		|| (mesh.property(QuaMat_e, qpq.top().idx) != qpq.top().qem)
+		|| (mesh.property(valence, mesh.from_vertex_handle(mesh.halfedge_handle(qpq.top().idx, 0))) + mesh.property(valence, mesh.to_vertex_handle(mesh.halfedge_handle(qpq.top().idx, 0))) > 12)))
 	{
-		if (qpq.size() == 0)
-		{
-			mesh.garbage_collection(true);
-			return false;
-		}
-		else
-		{
-			currentEdge = qpq.top();
-			qpq.pop();
-			valence = mesh.valence(mesh.from_vertex_handle(mesh.halfedge_handle(currentEdge.idx, 0)));
-			valence += mesh.valence(mesh.to_vertex_handle(mesh.halfedge_handle(currentEdge.idx, 0)));
-		}
-	} while ((mesh.status(mesh.edge_handle(mesh.halfedge_handle(currentEdge.idx, 0))).deleted()) || (mesh.property(QuaMat_e, currentEdge.idx) != currentEdge.qem) || (valence > 12));
-	if (currentEdge.qem < err_threshhold)
+		qpq.pop();
+	}
+	if (qpq.empty())
 	{
-		auto idx = mesh.halfedge_handle(currentEdge.idx, 0);
-		std::vector<int> re_in = {
+		return false;
+	}
+	if (qpq.top().qem < err_threshhold)
+	{
+		auto idx = mesh.halfedge_handle(qpq.top().idx, 0);
+		index_collapse_v_to_v.push_back({
 			mesh.property(vindex, mesh.from_vertex_handle(idx)),
 			mesh.property(vindex, mesh.to_vertex_handle(idx)),
-			mesh.property(vindex, mesh.opposite_vh(idx)),
-			mesh.property(vindex, mesh.opposite_he_opposite_vh(idx))
-		};
-		index_collapse_v_to_v.push_back(re_in);
-		mesh.set_point(mesh.to_vertex_handle(idx), mesh.property(new_point, currentEdge.idx));
+			mesh.property(vindex, mesh.to_vertex_handle(mesh.next_halfedge_handle(idx))),
+			mesh.property(vindex, mesh.to_vertex_handle(mesh.next_halfedge_handle(mesh.opposite_halfedge_handle(idx))))
+			});
+		mesh.set_point(mesh.to_vertex_handle(idx), mesh.property(new_point, qpq.top().idx));
 		mesh.collapse(idx);
+		qpq.pop();
 		UpdateEdgeCost(mesh.to_vertex_handle(idx));
 		return true;
 	}
 	else
 	{
-		mesh.garbage_collection(true);
-		std::cout << "can not collapsed anymore !   " << "Current minimize qem is : " << currentEdge.qem << std::endl;
+		std::cout << "can not collapsed anymore !   " << "Current minimize qem is : " << qpq.top().qem << std::endl;
 		return false;
 	}
 }
 
 void QEMSimplification::InitialEdgeCost(void)
 {
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		auto heh = mesh.halfedge_handle(fh);
-		const auto & p0 = mesh.point(mesh.from_vertex_handle(heh));
-		const auto & p1 = mesh.point(mesh.to_vertex_handle(heh));
-		const auto & p2 = mesh.point(mesh.opposite_vh(heh));
-		auto n = (p1 - p0) % (p2 - p0);
+		const auto& p0 = mesh.point(mesh.from_vertex_handle(heh));
+		const auto& p1 = mesh.point(mesh.to_vertex_handle(heh));
+		const auto& p2 = mesh.point(mesh.opposite_vh(heh));
+		Mesh::Point n = (p1 - p0) % (p2 - p0);
 		double area = n.norm();
 		mesh.property(area_f, fh) = area;
 		n = (area == 0.0) ? Mesh::Point(0) : (n / area);
-
-		double a = n[0];
-		double b = n[1];
-		double c = n[2];
-		double d = -(n | p0);
-		mesh.property(QuaMat_f, fh) <<
-			a * a, a * b, a * c, a * d,
-			b * a, b * b, b * c, b * d,
-			c * a, c * b, c * c, c * d,
-			d * a, d * b, d * c, d * d;
+		Eigen::Vector4d vec(n[0], n[1], n[2], -(n | p0));
+		mesh.property(QuaMat_f, fh) = vec * vec.transpose();
 	}
 
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		mesh.property(QuaMat_v, vh) = Eigen::Matrix4d::Zero();
-		for (const auto & vfh : mesh.vf_range(vh))
+		mesh.property(valence, vh) = 0;
+		for (const auto& voheh : mesh.voh_range(vh))
 		{
-			mesh.property(QuaMat_v, vh) += mesh.property(QuaMat_f, vfh);
+			auto fh = mesh.face_handle(voheh);
+			if (fh.is_valid())
+			{
+				mesh.property(QuaMat_v, vh) += mesh.property(QuaMat_f, fh);
+			}
+			++mesh.property(valence, vh);
 		}
 	}
 	std::vector<EdgeQEM> initialcost;
 	initialcost.reserve(mesh.n_edges());
-	for (const auto & eh : mesh.edges())
+	for (const auto& eh : mesh.edges())
 	{
 		auto heh = mesh.halfedge_handle(eh, 0);
 		auto vh0 = mesh.to_vertex_handle(heh);
 		auto vh1 = mesh.from_vertex_handle(heh);
 		auto mat = mesh.property(QuaMat_v, vh0) + mesh.property(QuaMat_v, vh1);
-
-		Eigen::Matrix4d mid_m = mat;
-		mid_m(3, 0) = mid_m(3, 1) = mid_m(3, 2) = 0.0;
-		mid_m(3, 3) = 1.0;
-		Eigen::Vector4d b(0.0, 0.0, 0.0, 1.0);
-		Eigen::Vector4d v;
-		OpenMesh::Vec3d new_p;
-		if (fabs(mid_m.determinant()) < 1e-4)
+		if (std::fabs(mat.topLeftCorner(3, 3).determinant()) < 1e-4)
 		{
-			new_p = (mesh.point(vh0) + mesh.point(vh1)) / 2;
-			v << new_p[0], new_p[1], new_p[2], 1.0;
+			Mesh::Point newp = (mesh.point(vh0) + mesh.point(vh1)) * 0.5;
+			mesh.property(new_point, eh) = newp;
+			if (mesh.is_collapse_ok(heh))
+			{
+				double err = mat(3, 3) + Eigen::RowVector3d(newp[0], newp[1], newp[2]) * (mat.topLeftCorner(3, 3) * Eigen::Vector3d(newp[0], newp[1], newp[2]) + 2.0 * mat.topRightCorner(3, 1));
+				mesh.property(QuaMat_e, eh) = err * mesh.property(valence, vh0) * mesh.property(valence, vh1);
+			}
+			else
+			{
+				mesh.property(QuaMat_e, eh) = DBL_MAX;
+			}
 		}
 		else
 		{
-			v = mid_m.colPivHouseholderQr().solve(b);
-			new_p = { v[0], v[1], v[2] };
+			Eigen::Vector3d newpe = mat.topLeftCorner(3, 3).selfadjointView<Eigen::Upper>().ldlt().solve(mat.topRightCorner(3, 1));
+			mesh.property(new_point, eh) = { -newpe[0], -newpe[1], -newpe[2] };
+			if (mesh.is_collapse_ok(heh))
+			{
+				double err = mat(3, 3) - Eigen::Vector3d(mat.topRightCorner(3, 1)).dot(newpe);
+				mesh.property(QuaMat_e, eh) = err * mesh.property(valence, vh0) * mesh.property(valence, vh1);
+			}
+			else
+			{
+				mesh.property(QuaMat_e, eh) = DBL_MAX;
+			}
 		}
-		mesh.property(new_point, eh) = new_p;
-		double err = v.transpose() * mat * v;
-		err *= (mesh.valence(vh0) * mesh.valence(vh1));
-		err = mesh.is_collapse_ok(heh) ? err : DBL_MAX;
-		mesh.property(QuaMat_e, eh) = err;
-		initialcost.push_back({ eh, err });
+		initialcost.push_back({ eh, mesh.property(QuaMat_e, eh) });
 	}
 	qpq = std::priority_queue<EdgeQEM>(initialcost.begin(), initialcost.end());
 }
 
-void QEMSimplification::UpdateEdgeCost(const Mesh::VertexHandle & vh)
+void QEMSimplification::UpdateEdgeCost(const Mesh::VertexHandle& vh)
 {
 	mesh.property(QuaMat_v, vh) = Eigen::Matrix4d::Zero();
-	for (const auto & vfh : mesh.vf_range(vh))
+	mesh.property(valence, vh) = 0;
+	const auto& p = mesh.point(vh);
+	for (const auto& voheh : mesh.voh_range(vh))
 	{
-		auto heh = mesh.halfedge_handle(vfh);
-		const auto & p0 = mesh.point(mesh.from_vertex_handle(heh));
-		const auto & p1 = mesh.point(mesh.to_vertex_handle(heh));
-		const auto & p2 = mesh.point(mesh.opposite_vh(heh));
-		auto n = (p1 - p0) % (p2 - p0);
-		double area = n.norm();
-		mesh.property(area_f, vfh) = area;
-		n /= area;
-		double a = n[0];
-		double b = n[1];
-		double c = n[2];
-		double d = -(n | p0);
-		Eigen::Matrix4d mat;
-		mat << a * a, a*b, a*c, a*d,
-			b*a, b*b, b*c, b*d,
-			c*a, c*b, c*c, c*d,
-			d*a, d*b, d*c, d*d;
-		mesh.property(QuaMat_f, vfh) = mat;
-		mesh.property(QuaMat_v, vh) += mat;
+		auto vfh = mesh.face_handle(voheh);
+		if (vfh.is_valid())
+		{
+			const auto& p1 = mesh.point(mesh.to_vertex_handle(voheh));
+			const auto& p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(voheh)));
+			Mesh::Point n = (p1 - p) % (p2 - p);
+			double area = n.norm();
+			mesh.property(area_f, vfh) = area;
+			n /= area;
+			Eigen::Vector4d vec(n[0], n[1], n[2], -(n | p));
+			mesh.property(QuaMat_f, vfh) = vec * vec.transpose();
+			mesh.property(QuaMat_v, vh) += mesh.property(QuaMat_f, vfh);
+		}
+		++mesh.property(valence, vh);
 	}
 
-	for (const auto & vvh : mesh.vv_range(vh))
+	for (const auto& vvh : mesh.vv_range(vh))
 	{
 		mesh.property(QuaMat_v, vvh) = Eigen::Matrix4d::Zero();
-		for (const auto & vvfh : mesh.vf_range(vvh))
+		mesh.property(valence, vvh) = 0;
+		for (const auto& voheh : mesh.voh_range(vvh))
 		{
-			mesh.property(QuaMat_v, vvh) += mesh.property(QuaMat_f, vvfh);
+			auto fh = mesh.face_handle(voheh);
+			if (fh.is_valid())
+			{
+				mesh.property(QuaMat_v, vvh) += mesh.property(QuaMat_f, fh);
+			}
+			++mesh.property(valence, vvh);
 		}
 	}
 
-
-	for (const auto & vvh : mesh.vv_range(vh))
+	for (const auto& vvh : mesh.vv_range(vh))
 	{
-		for (const auto & veh : mesh.ve_range(vvh))
+		for (const auto& veh : mesh.ve_range(vvh))
 		{
 			if (!mesh.property(is_cal_e, veh))
 			{
@@ -213,42 +203,43 @@ void QEMSimplification::UpdateEdgeCost(const Mesh::VertexHandle & vh)
 				auto vh0 = mesh.to_vertex_handle(heh);
 				auto vh1 = mesh.from_vertex_handle(heh);
 				auto mat = mesh.property(QuaMat_v, vh0) + mesh.property(QuaMat_v, vh1);
-				Eigen::Matrix4d mid_m = mat;
-				mid_m(3, 0) = mid_m(3, 1) = mid_m(3, 2) = 0.0;
-				mid_m(3, 3) = 1.0;
-				Eigen::Vector4d b(0.0, 0.0, 0.0, 1.0);
-				Eigen::Vector4d v;
-				OpenMesh::Vec3d new_p;
-				if (fabs(mid_m.determinant()) < 1e-4)
+				if (std::fabs(mat.topLeftCorner(3, 3).determinant()) < 1e-4)
 				{
-					new_p = (mesh.point(vh0) + mesh.point(vh1)) / 2;
-					v << new_p[0], new_p[1], new_p[2], 1.0;
+					Mesh::Point newp = (mesh.point(vh0) + mesh.point(vh1)) * 0.5;
+					mesh.property(new_point, veh) = newp;
+					if (mesh.is_collapse_ok(heh))
+					{
+						double err = mat(3, 3) + Eigen::RowVector3d(newp[0], newp[1], newp[2]) * (mat.topLeftCorner(3, 3) * Eigen::Vector3d(newp[0], newp[1], newp[2]) + 2.0 * mat.topRightCorner(3, 1));
+						mesh.property(QuaMat_e, veh) = err * mesh.property(valence, vh0) * mesh.property(valence, vh1);
+						qpq.push({ veh, mesh.property(QuaMat_e, veh) });
+					}
+					else
+					{
+						mesh.property(QuaMat_e, veh) = DBL_MAX;
+					}
 				}
 				else
 				{
-					v = mid_m.colPivHouseholderQr().solve(b);
-					new_p = { v[0], v[1], v[2] };
-				}
-				mesh.property(new_point, veh) = new_p;
-				double err = v.transpose() * mat * v;
-				err *= (mesh.valence(vh0) * mesh.valence(vh1));
-				if (mesh.is_collapse_ok(heh) && mesh.is_collapse_ok(mesh.opposite_halfedge_handle(heh)))
-				{
-
-					mesh.property(QuaMat_e, veh) = err;
-					qpq.push({ veh, err });
-				}
-				else
-				{
-					mesh.property(QuaMat_e, veh) = DBL_MAX;
+					Eigen::Vector3d newpe = mat.topLeftCorner(3, 3).selfadjointView<Eigen::Upper>().ldlt().solve(mat.topRightCorner(3, 1));
+					mesh.property(new_point, veh) = { -newpe[0], -newpe[1], -newpe[2] };
+					if (mesh.is_collapse_ok(heh))
+					{
+						double err = mat(3, 3) - Eigen::Vector3d(mat.topRightCorner(3, 1)).dot(newpe);
+						mesh.property(QuaMat_e, veh) = err * mesh.property(valence, vh0) * mesh.property(valence, vh1);
+						qpq.push({ veh, mesh.property(QuaMat_e, veh) });
+					}
+					else
+					{
+						mesh.property(QuaMat_e, veh) = DBL_MAX;
+					}
 				}
 				mesh.property(is_cal_e, veh) = true;
 			}
 		}
 	}
-	for (const auto & vvh : mesh.vv_range(vh))
+	for (const auto& vvh : mesh.vv_range(vh))
 	{
-		for (const auto & veh : mesh.ve_range(vvh))
+		for (const auto& veh : mesh.ve_range(vvh))
 		{
 			mesh.property(is_cal_e, veh) = false;
 		}

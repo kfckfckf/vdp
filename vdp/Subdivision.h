@@ -5,17 +5,17 @@
 class Subdivision
 {
 public:
-	Subdivision(const Mesh & m);
+	Subdivision(const Mesh& m);
 	~Subdivision(void);
 
 	// Subdivide the mesh
 	void Subdivide(int tarnum);
 
 	// Get the subdivided mesh
-	const Mesh & GetMesh(void) const;
+	const Mesh& GetMesh(void) const;
 
 	// Get the original index from a subdivided mesh
-	int OriginalIndex(int vid) const;
+	const std::vector<int>& OriginalIndex(void) const;
 
 private:
 	Mesh mesh; // mesh need to be subdivided

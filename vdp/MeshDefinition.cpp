@@ -4,7 +4,7 @@
 #include <iostream>
 #include <fstream>
 
-bool MeshTools::ReadMesh(Mesh & mesh, const std::string & filename)
+bool MeshTools::ReadMesh(Mesh& mesh, const std::string& filename)
 {
 	std::string path(".");
 	auto slash = filename.find_last_of('/');
@@ -43,7 +43,7 @@ bool MeshTools::ReadMesh(Mesh & mesh, const std::string & filename)
 	}
 }
 
-bool MeshTools::ReadOBJ(Mesh & mesh, const std::string & filename)
+bool MeshTools::ReadOBJ(Mesh& mesh, const std::string& filename)
 {
 	std::ifstream ifs(filename);
 	if (!ifs.is_open())
@@ -220,7 +220,7 @@ bool MeshTools::ReadOBJ(Mesh & mesh, const std::string & filename)
 	return true;
 }
 
-bool MeshTools::WriteMesh(const Mesh & mesh, const std::string & filename, const std::streamsize & precision)
+bool MeshTools::WriteMesh(const Mesh& mesh, const std::string& filename, const std::streamsize& precision)
 {
 	std::string path(".");
 	auto slash = filename.find_last_of('/');
@@ -260,7 +260,7 @@ bool MeshTools::WriteMesh(const Mesh & mesh, const std::string & filename, const
 	}
 }
 
-bool MeshTools::WriteOBJ(const Mesh & mesh, const std::string & filename, const std::streamsize & precision)
+bool MeshTools::WriteOBJ(const Mesh& mesh, const std::string& filename, const std::streamsize& precision)
 {
 	std::ofstream ofs(filename);
 	if (!ofs.is_open())
@@ -286,25 +286,25 @@ bool MeshTools::WriteOBJ(const Mesh & mesh, const std::string & filename, const 
 	return true;
 }
 
-double MeshTools::Area(const Mesh & mesh)
+double MeshTools::Area(const Mesh& mesh)
 {
 	double area = 0.0;
-	for (const auto & f : mesh.faces())
+	for (const auto& f : mesh.faces())
 	{
 		auto heh = mesh.halfedge_handle(f);
-		const auto & p0 = mesh.point(mesh.from_vertex_handle(heh));
-		const auto & p1 = mesh.point(mesh.to_vertex_handle(heh));
-		const auto & p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(heh)));
+		const auto& p0 = mesh.point(mesh.from_vertex_handle(heh));
+		const auto& p1 = mesh.point(mesh.to_vertex_handle(heh));
+		const auto& p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(heh)));
 		area += 0.5 * ((p1 - p0) % (p2 - p0)).norm();
 	}
 	return area;
 }
 
-double MeshTools::AverageEdgeLength(const Mesh & mesh)
+double MeshTools::AverageEdgeLength(const Mesh& mesh)
 {
 	if (mesh.edges_empty()) return 0.0;
 	double l = 0.0;
-	for (const auto & eh : mesh.edges())
+	for (const auto& eh : mesh.edges())
 	{
 		l += mesh.calc_edge_length(eh);
 	}
@@ -312,10 +312,10 @@ double MeshTools::AverageEdgeLength(const Mesh & mesh)
 	return l;
 }
 
-bool MeshTools::HasBoundary(const Mesh & mesh)
+bool MeshTools::HasBoundary(const Mesh& mesh)
 {
 	if (mesh.halfedges_empty()) return false;
-	for (const auto & heh : mesh.halfedges())
+	for (const auto& heh : mesh.halfedges())
 	{
 		if (mesh.is_boundary(heh))
 		{
@@ -325,7 +325,7 @@ bool MeshTools::HasBoundary(const Mesh & mesh)
 	return false;
 }
 
-bool MeshTools::HasOneComponent(const Mesh & mesh)
+bool MeshTools::HasOneComponent(const Mesh& mesh)
 {
 	if (mesh.faces_empty()) return false;
 	std::vector<int> visit(mesh.n_faces(), 0);
@@ -336,7 +336,7 @@ bool MeshTools::HasOneComponent(const Mesh & mesh)
 	{
 		int fid = q.front();
 		q.pop();
-		for (const auto & ffh : mesh.ff_range(mesh.face_handle(fid)))
+		for (const auto& ffh : mesh.ff_range(mesh.face_handle(fid)))
 		{
 			if (!visit[ffh.idx()])
 			{
@@ -345,7 +345,7 @@ bool MeshTools::HasOneComponent(const Mesh & mesh)
 			}
 		}
 	}
-	for (const auto & v : visit)
+	for (const auto& v : visit)
 	{
 		if (!v)
 		{
@@ -355,13 +355,13 @@ bool MeshTools::HasOneComponent(const Mesh & mesh)
 	return true;
 }
 
-int MeshTools::Genus(const Mesh & mesh)
+int MeshTools::Genus(const Mesh& mesh)
 {
 	if (HasBoundary(mesh) || !HasOneComponent(mesh)) return -1;
 	return 1 - ((int)mesh.n_vertices() + (int)mesh.n_faces() - (int)mesh.n_edges()) / 2;
 }
 
-void MeshTools::BoundingBox(const Mesh & mesh, Mesh::Point & bmax, Mesh::Point & bmin)
+void MeshTools::BoundingBox(const Mesh& mesh, Mesh::Point& bmax, Mesh::Point& bmin)
 {
 	if (mesh.vertices_empty()) return;
 	bmax = bmin = mesh.point(*mesh.vertices_begin());
@@ -375,17 +375,17 @@ void MeshTools::BoundingBox(const Mesh & mesh, Mesh::Point & bmax, Mesh::Point &
 // This function should be used after collapse or split, since the indices of
 //   edges may be changed after a local modification. By using this function,
 //   the indices of edges are the same as a mesh loaded from obj files.
-void MeshTools::Reassign(const Mesh & mesh1, Mesh & mesh2)
+void MeshTools::Reassign(const Mesh& mesh1, Mesh& mesh2)
 {
 	mesh2.clear();
-	for (const auto & vh : mesh1.vertices())
+	for (const auto& vh : mesh1.vertices())
 	{
 		mesh2.add_vertex(mesh1.point(vh));
 	}
-	for (const auto & fh : mesh1.faces())
+	for (const auto& fh : mesh1.faces())
 	{
 		std::vector<Mesh::VertexHandle> vhs;
-		for (const auto & fvh : mesh1.fv_range(fh))
+		for (const auto& fvh : mesh1.fv_range(fh))
 		{
 			vhs.push_back(mesh2.vertex_handle(fvh.idx()));
 		}

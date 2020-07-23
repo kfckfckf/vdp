@@ -4,7 +4,7 @@ MinimalSpanningTree::~MinimalSpanningTree(void)
 {
 }
 
-MinimalSpanningTree::MinimalSpanningTree(const Mesh & m)
+MinimalSpanningTree::MinimalSpanningTree(const Mesh& m)
 	:mesh(m),
 	nv(0),
 	ne(0),
@@ -12,16 +12,16 @@ MinimalSpanningTree::MinimalSpanningTree(const Mesh & m)
 {
 }
 
-MinimalSpanningTree::MinimalSpanningTree(const Mesh & m, const std::vector<int> & vertex)
+MinimalSpanningTree::MinimalSpanningTree(const Mesh& m, const std::vector<int>& vertex)
 	:MinimalSpanningTree(m, vertex, {})
 {
 }
 
-MinimalSpanningTree::MinimalSpanningTree(const Mesh & m, const std::vector<int> & vertex, const std::vector<int> & isaccessible)
-	:mesh(m),
+MinimalSpanningTree::MinimalSpanningTree(const Mesh& m, const std::vector<int>& vertex, const std::vector<int>& isaccessible)
+	: mesh(m),
 	nodes(vertex),
 	nv(static_cast<int>(vertex.size())),
-	ne(nv * (nv - 1) / 2),
+	ne(nv* (nv - 1) / 2),
 	findgeodesic(mesh)
 {
 	shortestedges.reserve(ne);
@@ -39,7 +39,7 @@ MinimalSpanningTree::MinimalSpanningTree(const Mesh & m, const std::vector<int> 
 	}
 }
 
-void MinimalSpanningTree::SetNodes(const std::vector<int>& vertex, const std::vector<int> & isaccessible)
+void MinimalSpanningTree::SetNodes(const std::vector<int>& vertex, const std::vector<int>& isaccessible)
 {
 	nodes = vertex;
 	nv = static_cast<int>(vertex.size());
@@ -98,12 +98,12 @@ void MinimalSpanningTree::Prim(void)
 	std::vector<std::pair<int, int>> edges = GetEdges();// edges in the graph
 	spanningtreeedges.push_back(shortestedges[edges[0].second + edges[0].first * (edges[0].first - 1) / 2]);
 	std::vector<int> istarget(mesh.n_vertices(), 0);
-	for (const auto & s : spanningtreeedges[0])
+	for (const auto& s : spanningtreeedges[0])
 	{
 		istarget[s] = 1;
 	}
 	std::vector<int> source;
-	for (const auto & i : nodes)
+	for (const auto& i : nodes)
 	{
 		if (i != nodes[edges[0].first] && i != nodes[edges[0].second])
 		{
@@ -115,7 +115,7 @@ void MinimalSpanningTree::Prim(void)
 		double minlen = DBL_MAX;
 		std::vector<int> minpath;
 		int minsource;
-		for (const auto & souv : source)
+		for (const auto& souv : source)
 		{
 			auto tarv = findgeodesic.Compute(souv, istarget, {});
 			auto len = findgeodesic.GetLength(tarv);
@@ -127,7 +127,7 @@ void MinimalSpanningTree::Prim(void)
 			}
 		}
 		spanningtreeedges.push_back(minpath);
-		for (const auto & vid : minpath)
+		for (const auto& vid : minpath)
 		{
 			istarget[vid] = 1;
 		}
@@ -142,7 +142,7 @@ void MinimalSpanningTree::PrimAlter(void)
 	spanningtreeedges.push_back(shortestedges[edges[0].second + edges[0].first * (edges[0].first - 1) / 2]);
 	std::vector<int> istarget(mesh.n_vertices(), 0);
 	std::vector<int> isaccessible(mesh.n_vertices(), 1);
-	for (const auto & s : spanningtreeedges[0])
+	for (const auto& s : spanningtreeedges[0])
 	{
 		isaccessible[s] = 0;
 	}
@@ -152,7 +152,7 @@ void MinimalSpanningTree::PrimAlter(void)
 	istarget[nodes[edges[0].second]] = 1;
 
 	std::vector<int> source;
-	for (const auto & i : nodes)
+	for (const auto& i : nodes)
 	{
 		if (i != nodes[edges[0].first] && i != nodes[edges[0].second])
 		{
@@ -164,7 +164,7 @@ void MinimalSpanningTree::PrimAlter(void)
 		double minlen = DBL_MAX;
 		std::vector<int> minpath;
 		int minsource;
-		for (const auto & souv : source)
+		for (const auto& souv : source)
 		{
 			auto tarv = findgeodesic.Compute(souv, istarget, isaccessible);
 			auto path = findgeodesic.GetPath(tarv);
@@ -177,7 +177,7 @@ void MinimalSpanningTree::PrimAlter(void)
 			}
 		}
 		spanningtreeedges.push_back(minpath);
-		for (const auto & vid : minpath)
+		for (const auto& vid : minpath)
 		{
 			isaccessible[vid] = 0;
 		}
@@ -187,7 +187,7 @@ void MinimalSpanningTree::PrimAlter(void)
 		istarget[minpath.back()] = 1;
 
 		std::vector<int> newsource;
-		for (const auto & souv : source)
+		for (const auto& souv : source)
 		{
 			if (souv != minsource)
 			{
@@ -198,7 +198,7 @@ void MinimalSpanningTree::PrimAlter(void)
 	}
 }
 
-const std::vector<std::vector<int>> & MinimalSpanningTree::GetSpanningTreeEdges(void) const
+const std::vector<std::vector<int>>& MinimalSpanningTree::GetSpanningTreeEdges(void) const
 {
 	return spanningtreeedges;
 }
@@ -216,6 +216,6 @@ std::vector<std::pair<int, int>> MinimalSpanningTree::GetEdges(void) const
 			k++;
 		}
 	}
-	std::sort(edges.begin(), edges.end(), [&](const std::pair<int, int> & lhs, const std::pair<int, int> & rhs) { return weight[lhs.second + lhs.first * (lhs.first - 1) / 2] < weight[rhs.second + rhs.first * (rhs.first - 1) / 2]; });
+	std::sort(edges.begin(), edges.end(), [&](const std::pair<int, int>& lhs, const std::pair<int, int>& rhs) { return weight[lhs.second + lhs.first * (lhs.first - 1) / 2] < weight[rhs.second + rhs.first * (rhs.first - 1) / 2]; });
 	return edges;
 }

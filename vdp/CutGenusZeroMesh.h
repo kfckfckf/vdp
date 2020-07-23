@@ -6,7 +6,7 @@ class CutGenusZeroMesh :
 	public CutClosedMesh
 {
 public:
-	CutGenusZeroMesh(const Mesh & mesh);
+	CutGenusZeroMesh(const Mesh& mesh);
 	virtual ~CutGenusZeroMesh();
 
 	// main algorithm of cutting a genus-zero mesh

@@ -1,7 +1,7 @@
 #include "ShortestPath.h"
 #include <queue>
 
-ShortestPath::ShortestPath(const Mesh & mesh_)
+ShortestPath::ShortestPath(const Mesh& mesh_)
 	:mesh(mesh_),
 	dist(mesh_.n_vertices()),
 	prev(mesh_.n_vertices()),
@@ -9,7 +9,7 @@ ShortestPath::ShortestPath(const Mesh & mesh_)
 {
 	for (const auto& vh : mesh_.vertices())
 	{
-		auto & vecpair = G[vh.idx()];
+		auto& vecpair = G[vh.idx()];
 		const auto& p0 = mesh_.point(vh);
 		for (const auto& vvh : mesh_.vv_range(vh))
 		{
@@ -22,16 +22,16 @@ ShortestPath::~ShortestPath(void)
 {
 }
 
-void ShortestPath::SetEdgeWeight(const std::vector<std::vector<double>> & weight)
+void ShortestPath::SetEdgeWeight(const std::vector<std::vector<double>>& weight)
 {
 	G.clear();
 	G.resize(mesh.n_vertices());
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		auto vid = vh.idx();
-		auto & vecpair = G[vid];
+		auto& vecpair = G[vid];
 		int counter = 0;
-		for (const auto & vvh : mesh.vv_range(vh))
+		for (const auto& vvh : mesh.vv_range(vh))
 		{
 			vecpair.push_back({ vvh.idx(), weight[vid][counter] });
 			counter++;
@@ -39,7 +39,7 @@ void ShortestPath::SetEdgeWeight(const std::vector<std::vector<double>> & weight
 	}
 }
 
-int ShortestPath::Compute(const int & source, const std::vector<int>& istarget, const std::vector<int> & isaccessible, const int& size)
+int ShortestPath::Compute(const int& source, const std::vector<int>& istarget, const std::vector<int>& isaccessible, const int& size)
 {
 	int counter = 0;
 	int closest = -1;
@@ -47,16 +47,16 @@ int ShortestPath::Compute(const int & source, const std::vector<int>& istarget, 
 	dist.assign(mesh.n_vertices(), DBL_MAX);
 	prev.assign(mesh.n_vertices(), -1);
 	dist[source] = 0;
-	auto cmp = [](const std::pair<int, double> & lhs, const std::pair<int, double> & rhs) { return lhs.second > rhs.second; };
+	auto cmp = [](const std::pair<int, double>& lhs, const std::pair<int, double>& rhs) { return lhs.second > rhs.second; };
 	std::priority_queue<std::pair<int, double>, std::vector<std::pair<int, double>>, decltype(cmp)> Q(cmp);
 	Q.push(std::pair<int, double>(source, 0.0));
 	while (!Q.empty())
 	{
-		const auto & top = Q.top();
+		const auto& top = Q.top();
 		int i = top.first;
 		double c = top.second;
 		Q.pop();
-		
+
 		if (c <= dist[i])
 		{
 			if (istarget[i])
@@ -71,7 +71,7 @@ int ShortestPath::Compute(const int & source, const std::vector<int>& istarget, 
 					break;
 				}
 			}
-			for (const auto & pi : G[i])
+			for (const auto& pi : G[i])
 			{
 				int i2 = pi.first;
 				double c2 = pi.second;
@@ -87,7 +87,7 @@ int ShortestPath::Compute(const int & source, const std::vector<int>& istarget, 
 	return closest;
 }
 
-std::vector<int> ShortestPath::GetPath(const int & tar_v) const
+std::vector<int> ShortestPath::GetPath(const int& tar_v) const
 {
 	std::vector<int> geo;
 	int tmp = tar_v;
@@ -99,7 +99,7 @@ std::vector<int> ShortestPath::GetPath(const int & tar_v) const
 	return geo;
 }
 
-const double & ShortestPath::GetLength(const int & target) const
+const double& ShortestPath::GetLength(const int& target) const
 {
 	return dist[target];
 }

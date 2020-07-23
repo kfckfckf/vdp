@@ -1,44 +1,40 @@
 #pragma once
 #include "MeshDefinition.h"
 
+class ParameterManager;
+
 // Class of voting distortion point application
 class VDPApp
 {
 private:
-	VDPApp(void);
-	~VDPApp(void);
+	VDPApp();
+	~VDPApp();
+
 public:
-	VDPApp(VDPApp const&) = delete;
-	VDPApp(VDPApp &&) = delete;
-	VDPApp& operator=(VDPApp const&) = delete;
-	VDPApp& operator=(VDPApp &&) = delete;
+	VDPApp(const VDPApp&) = delete;
+	VDPApp(VDPApp&&) = delete;
+	VDPApp& operator=(const VDPApp&) = delete;
+	VDPApp& operator=(VDPApp&&) = delete;
 
 	// Get application instance
-	static VDPApp& GetInstance(void);
+	static VDPApp& GetInstance();
 
 	// Parse command line
-	bool ParseCommand(int argc, char *argv[]);
+	bool ParseCommand(int argc, char* argv[]);
 
 	// Run the application
-	bool Run(void);
+	bool Run();
 
 private:
 	// Print error information
-	void PrintError(void);
+	void PrintError() const;
 
 	// Cut the mesh
-	void CutMesh(void);
+	void CutMesh();
 
-	Mesh mesh; // input mesh
-	std::string meshfilename; // input mesh file name
-	std::string meshpath;     // path to the mesh file
-	std::string meshbasename; // base name of the mesh file
+	std::unique_ptr<ParameterManager> pm; // parameters
 
-	bool saveintermediate = false; // parameter: save intermediate results ?
-	int size = 13;                 // parameter: local feature size N
-	bool geodesic = false;         // parameter: use geodesic or not
-	int nvsimplify = 13000;        // parameter: vertex number of simplified mesh
-	int nrandom = 10;              // parameter: number of random cutting process
-	int nvoting = 2;               // parameter: voting threshold
-	int npost = 5;                 // parameter: n-ring of post-processing
+	std::unique_ptr<Mesh> mesh; // input mesh
+	std::string meshfilename;   // input mesh file name
+	std::string meshbasename;   // base name of the mesh file
 };

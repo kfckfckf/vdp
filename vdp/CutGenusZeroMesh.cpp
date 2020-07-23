@@ -6,7 +6,7 @@
 #include <iostream>
 #include <fstream>
 
-CutGenusZeroMesh::CutGenusZeroMesh(const Mesh & mesh)
+CutGenusZeroMesh::CutGenusZeroMesh(const Mesh& mesh)
 	:CutClosedMesh(mesh)
 {
 }
@@ -18,10 +18,19 @@ CutGenusZeroMesh::~CutGenusZeroMesh()
 
 void CutGenusZeroMesh::Run(void)
 {
-	std::cout << "Start remeshing." << std::endl;
-	auto t = clock();
+	if (verbose)
+	{
+		std::cout << "Start remeshing.\n";
+	}
+	
+	auto tstart = std::chrono::system_clock::now();
 	Remesh(nvsimplify);
-	std::cout << "Finished. Time: " << (clock() - t) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+	if (verbose)
+	{
+		auto tend = std::chrono::system_clock::now();
+		std::cout << "Finished. Time: " << std::chrono::duration<double>(tend - tstart).count() << "s.\n";
+	}
+	
 	if (saveintermediate)
 	{
 		MeshTools::WriteMesh(remesh, basefile + "_remesh.obj", 16);
@@ -41,9 +50,14 @@ void CutGenusZeroMesh::Run(void)
 				std::cout << "Warning: save landmarks failed." << std::endl;
 			}
 		}
-		auto t = clock();
+		auto tstart = std::chrono::system_clock::now();
 		CutMesh(landmarks);
-		std::cout << "Cut the mesh finished. Time: " << (clock() - t) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+		if (verbose)
+		{
+			auto tend = std::chrono::system_clock::now();
+			std::cout << "Cut the mesh finished. Time: " << std::chrono::duration<double>(tend - tstart).count() << "s.\n";
+		}
+		
 		if (saveintermediate)
 		{
 			if (!SaveCuts(basefile + "_cut" + std::to_string(i) + ".txt",
@@ -54,18 +68,26 @@ void CutGenusZeroMesh::Run(void)
 			}
 			MeshTools::WriteMesh(currentmesh, basefile + "_open" + std::to_string(i).c_str() + ".obj", 16);
 		}
-		t = clock();
+		tstart = std::chrono::system_clock::now();
 		Parameterization();
-		std::cout << "Conformal parameterization finished. Time: " << (clock() - t) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+		if (verbose)
+		{
+			auto tend = std::chrono::system_clock::now();
+			std::cout << "Conformal parameterization finished. Time: " << std::chrono::duration<double>(tend - tstart).count() << "s.\n";
+		}
+		
 		if (saveintermediate)
 		{
 			MeshTools::WriteMesh(currentmesh, basefile + "_open_conformal" + std::to_string(i).c_str() + ".obj", 16);
 		}
-		t = clock();
+		tstart = std::chrono::system_clock::now();
 		ClusterLandmarks(size);
-		const auto & interlandmarks = hc->GetFeaturePoints();
-		std::cout << "Clustering finished. Point size: " << interlandmarks.size()
-			<< ". Time: " << (clock() - t) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+		const auto& interlandmarks = hc->GetFeaturePoints();
+		if (verbose)
+		{
+			auto tend = std::chrono::system_clock::now();
+			std::cout << "Clustering finished. Point size: " << interlandmarks.size() << ". Time: " << std::chrono::duration<double>(tend - tstart).count() << "s.\n";
+		}
 
 		intermediatelandmarks.push_back(interlandmarks);
 		if (saveintermediate)
@@ -74,15 +96,19 @@ void CutGenusZeroMesh::Run(void)
 		}
 	}
 
-	auto t1 = clock();
+	auto tstart1 = std::chrono::system_clock::now();
 	auto landmarks = RemoveNearbyLandmarks(VoteLandmarks(intermediatelandmarks));
 	landmarks = FindOrginalVertexIndex(landmarks);
-	std::cout << "Remove nearby landmarks finished. Time: " << (clock() - t1) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+	if (verbose)
+	{
+		auto tend = std::chrono::system_clock::now();
+		std::cout << "Remove nearby landmarks finished. Time: " << std::chrono::duration<double>(tend - tstart1).count() << "s.\n";
+	}
+	
 	SaveLandmarks(basefile + "_landmarks.txt", landmarks);
 	InitialCutMesh(orimesh);
-	t1 = clock();
+	tstart1 = std::chrono::system_clock::now();
 	double edgelength = MeshTools::AverageEdgeLength(orimesh);
-	std::cout << edgelength << std::endl;
 	if (landmarks.size() > 1)
 	{
 		CutMesh(landmarks);
@@ -92,8 +118,12 @@ void CutGenusZeroMesh::Run(void)
 		std::cout << "Too few landmarks found." << std::endl;
 		return;
 	}
-	std::cout << "Final cut generated. Time: " << (clock() - t1) / double(CLOCKS_PER_SEC) << "s." << std::endl;
-	std::cout << "Total time: " << (clock() - t) / double(CLOCKS_PER_SEC) << "s." << std::endl;
+	if (verbose)
+	{
+		auto tend = std::chrono::system_clock::now();
+		std::cout << "Final cut generated. Time: " << std::chrono::duration<double>(tend - tstart1).count() << "s.\n";
+		std::cout << "Total time: " << std::chrono::duration<double>(tend - tstart).count() << "s.\n";
+	}
 	if (!SaveCuts(basefile + "_cut.txt", mc->GetCutVertices(), mc->GetCutEdges()))
 	{
 		std::cout << "Warning: save cut failed." << std::endl;

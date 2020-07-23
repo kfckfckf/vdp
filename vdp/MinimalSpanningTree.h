@@ -7,13 +7,13 @@ class MinimalSpanningTree
 {
 public:
 	~MinimalSpanningTree(void);
-	MinimalSpanningTree(const Mesh & m);
-	MinimalSpanningTree(const Mesh & m, const std::vector<int> & vertex);
-	MinimalSpanningTree(const Mesh & m, const std::vector<int> & vertex,
-		const std::vector<int> & isaccessible);
+	MinimalSpanningTree(const Mesh& m);
+	MinimalSpanningTree(const Mesh& m, const std::vector<int>& vertex);
+	MinimalSpanningTree(const Mesh& m, const std::vector<int>& vertex,
+		const std::vector<int>& isaccessible);
 
 	// Set the nodes of the graph
-	void SetNodes(const std::vector<int> & vertex, const std::vector<int> & isaccessible = {});
+	void SetNodes(const std::vector<int>& vertex, const std::vector<int>& isaccessible = {});
 
 	// Kruskal's algorithm to compute minimal spanning tree
 	// Allow duplicate paths
@@ -28,13 +28,13 @@ public:
 	void PrimAlter(void);
 
 	// Get the final result
-	const std::vector<std::vector<int>> & GetSpanningTreeEdges(void) const;
+	const std::vector<std::vector<int>>& GetSpanningTreeEdges(void) const;
 
 private:
 	// Get sorted edges (i, j) (1 <= j < i <= nv - 1)
 	std::vector<std::pair<int, int>> GetEdges(void) const;
-	
-	const Mesh & mesh; // constant reference to the mesh
+
+	const Mesh& mesh; // constant reference to the mesh
 	std::vector<int> nodes;  // indices of source nodes
 	int nv;                  // number of nodes
 	int ne;                  // number of edges

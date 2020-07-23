@@ -1,16 +1,16 @@
 #include "Subdivision.h"
 #include <queue>
 
-Subdivision::Subdivision(const Mesh & m)
+Subdivision::Subdivision(const Mesh& m)
 	:mesh(m)
 {
 	mesh.add_property(vindex);
 	mesh.add_property(curvature);
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		mesh.property(vindex, vh) = vh.idx();
 		double c = 0;
-		for (const auto & viheh : mesh.vih_range(vh))
+		for (const auto& viheh : mesh.vih_range(vh))
 		{
 			c += mesh.calc_sector_angle(viheh);
 		}
@@ -25,9 +25,9 @@ Subdivision::~Subdivision(void)
 void Subdivision::Subdivide(int tarnum)
 {
 	typedef std::pair<Mesh::EdgeHandle, double> EdgeInfo;
-	auto cmp = [](const EdgeInfo & left, const EdgeInfo & right) { return left.second  < right.second; };
+	auto cmp = [](const EdgeInfo& left, const EdgeInfo& right) { return left.second < right.second; };
 	std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, decltype(cmp)> pq(cmp);
-	for (const auto & eh : mesh.edges())
+	for (const auto& eh : mesh.edges())
 	{
 		pq.push({ eh, mesh.calc_edge_sqr_length(eh) });
 	}
@@ -36,12 +36,12 @@ void Subdivision::Subdivide(int tarnum)
 		auto e0 = pq.top();
 		pq.pop();
 		auto heh = mesh.halfedge_handle(e0.first, 0);
-		const auto & p0 = mesh.point(mesh.from_vertex_handle(heh));
-		const auto & p1 = mesh.point(mesh.to_vertex_handle(heh));
+		const auto& p0 = mesh.point(mesh.from_vertex_handle(heh));
+		const auto& p1 = mesh.point(mesh.to_vertex_handle(heh));
 		auto newvh = mesh.split(e0.first, (p0 + p1) / 2);
 		mesh.property(curvature, newvh) = -DBL_MAX;
 		mesh.property(vindex, newvh) = -1;
-		for (const auto & voheh : mesh.voh_range(newvh))
+		for (const auto& voheh : mesh.voh_range(newvh))
 		{
 			pq.push({ mesh.edge_handle(voheh),mesh.calc_edge_sqr_length(voheh) });
 			if (mesh.property(curvature, mesh.to_vertex_handle(voheh)) >
@@ -59,12 +59,12 @@ void Subdivision::Subdivide(int tarnum)
 	mesh.garbage_collection();
 }
 
-const Mesh & Subdivision::GetMesh(void) const
+const Mesh& Subdivision::GetMesh(void) const
 {
 	return mesh;
 }
 
-int Subdivision::OriginalIndex(int vid) const
+const std::vector<int>& Subdivision::OriginalIndex(void) const
 {
-	return mesh.property(vindex, mesh.vertex_handle(vid));
+	return mesh.property(vindex).data_vector();
 }

@@ -1,6 +1,6 @@
 #include "MeshCut.h"
 
-MeshCut::MeshCut(const Mesh & mesh_)
+MeshCut::MeshCut(const Mesh& mesh_)
 	:mesh(mesh_)
 {
 }
@@ -9,11 +9,11 @@ MeshCut::~MeshCut(void)
 {
 }
 
-void MeshCut::mesh_cut(const std::vector<std::vector<int>> & boundary_point)
+void MeshCut::mesh_cut(const std::vector<std::vector<int>>& boundary_point)
 {
 	MarkVertexEdge(boundary_point);
 	ComputeValence();
-	
+
 	he_to_idx.clear();
 	idx_to_mesh_idx.clear();
 	he_to_idx.resize(mesh.n_halfedges());
@@ -44,10 +44,10 @@ void MeshCut::mesh_cut(const std::vector<std::vector<int>> & boundary_point)
 	} while (h_iter != h_begin);
 	boundary_number = uv_idx;
 
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		if (candidate_cut_valence[vh.idx()] > 0) continue;
-		for (const auto & viheh : mesh.vih_range(vh))
+		for (const auto& viheh : mesh.vih_range(vh))
 		{
 			he_to_idx[viheh.idx()] = uv_idx;
 		}
@@ -60,10 +60,10 @@ void MeshCut::mesh_cut(const std::vector<std::vector<int>> & boundary_point)
 	{
 		cuted_mesh.add_vertex(mesh.point(mesh.vertex_handle(idx_to_mesh_idx[i])));
 	}
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		std::vector<Mesh::VertexHandle> face_vhandles;
-		for (const auto & fheh : mesh.fh_range(fh))
+		for (const auto& fheh : mesh.fh_range(fh))
 		{
 			face_vhandles.push_back(cuted_mesh.vertex_handle(he_to_idx[fheh.idx()]));
 		}
@@ -78,7 +78,7 @@ void MeshCut::MarkVertexEdge(const std::vector<std::vector<int>>& boundarypoints
 	candidate_seam_edge.clear();
 	candidate_seam_edge.resize(mesh.n_edges(), false);
 
-	for (const auto & pts : boundarypoints)
+	for (const auto& pts : boundarypoints)
 	{
 		candidate_seam_vertex[pts[0]] = true;
 		for (size_t i = 0; i + 1 < pts.size(); i++)
@@ -99,7 +99,7 @@ void MeshCut::ComputeValence(void)
 {
 	candidate_cut_valence.clear();
 	candidate_cut_valence.resize(mesh.n_vertices(), 0);
-	for (const auto & eh : mesh.edges())
+	for (const auto& eh : mesh.edges())
 	{
 		if (candidate_seam_edge[eh.idx()])
 		{

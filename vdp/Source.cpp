@@ -1,15 +1,14 @@
 #include "VDPApp.h"
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-	auto && app = VDPApp::GetInstance();
-	int code = 0;
+	auto& app = VDPApp::GetInstance();
 	if (!app.ParseCommand(argc, argv))
 	{
-		code = 1;
+		return 1;
 	}
-	else if (!app.Run())
+	if (!app.Run())
 	{
-		code = 2;
+		return 2;
 	}
-	return code;
+	return 0;
 }

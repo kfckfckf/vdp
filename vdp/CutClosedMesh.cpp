@@ -9,16 +9,16 @@
 #include <iostream>
 #include <set>
 
-CutClosedMesh::CutClosedMesh(const Mesh & mesh)
+CutClosedMesh::CutClosedMesh(const Mesh& mesh)
 	:orimesh(mesh)
 {
 }
 
-CutClosedMesh::~CutClosedMesh(void)
+CutClosedMesh::~CutClosedMesh()
 {
 }
 
-void CutClosedMesh::Init(const int & s, const bool & issaveintermediate, const bool & isgeodesic, const int & nvsimplified, const int & nrandomcut, const int & nvotes, const int & npostprocess, const std::string & filename)
+void CutClosedMesh::Init(int s, bool issaveintermediate, bool isgeodesic, int nvsimplified, int nrandomcut, int nvotes, int npostprocess, const std::string& filename, bool verbose)
 {
 	size = s;
 	saveintermediate = issaveintermediate;
@@ -28,23 +28,25 @@ void CutClosedMesh::Init(const int & s, const bool & issaveintermediate, const b
 	nvoting = nvotes;
 	npost = npostprocess;
 	basefile = filename;
+	this->verbose = verbose;
 	if (saveintermediate && filename.empty())
 	{
 		std::cerr << "No base file name specified!" << std::endl;
 	}
 }
 
-bool CutClosedMesh::Remesh(const int & targetnv)
+bool CutClosedMesh::Remesh(int targetnv)
 {
-	originalvid.clear();
 	if (orimesh.n_vertices() > targetnv)
 	{
 		QEMSimplification qs(orimesh);
 		qs.Simplify(targetnv, 1);
 		MeshTools::Reassign(qs.GetMesh(), remesh);
-		for (const auto & vh : remesh.vertices())
+		originalvid = qs.OriginalIndex();
+		if (verbose)
 		{
-			originalvid.push_back(qs.OriginalIndex(vh.idx()));
+			std::cout << "Simplify is over!\n";
+			std::cout << "[V, E, F] = [" << remesh.n_vertices() << ", " << remesh.n_edges() << ", " << remesh.n_faces() << "]\n";
 		}
 	}
 	else
@@ -52,17 +54,14 @@ bool CutClosedMesh::Remesh(const int & targetnv)
 		Subdivision sub(orimesh);
 		sub.Subdivide(targetnv);
 		MeshTools::Reassign(sub.GetMesh(), remesh);
-		for (const auto & vh : remesh.vertices())
-		{
-			originalvid.push_back(sub.OriginalIndex(vh.idx()));
-		}
+		originalvid = sub.OriginalIndex();
 	}
 	hc = std::make_unique<HierarchicalClustering>(remesh);
 	InitialCutMesh(remesh);
 	return true;
 }
 
-bool CutClosedMesh::ClusterLandmarks(const int & size) const
+bool CutClosedMesh::ClusterLandmarks(int size) const
 {
 	if (hc)
 	{
@@ -73,14 +72,14 @@ bool CutClosedMesh::ClusterLandmarks(const int & size) const
 	return false;
 }
 
-bool CutClosedMesh::InitialCutMesh(const Mesh & mesh)
+bool CutClosedMesh::InitialCutMesh(const Mesh& mesh)
 {
 	mst = std::make_unique<MinimalSpanningTree>(mesh);
 	mc = std::make_unique<MeshCut>(mesh);
 	return true;
 }
 
-bool CutClosedMesh::CutMesh(const std::vector<int> & landmarks)
+bool CutClosedMesh::CutMesh(const std::vector<int>& landmarks)
 {
 	if (mc && mst)
 	{
@@ -93,16 +92,16 @@ bool CutClosedMesh::CutMesh(const std::vector<int> & landmarks)
 	return false;
 }
 
-bool CutClosedMesh::Parameterization(void)
+bool CutClosedMesh::Parameterization()
 {
-	KPNewton kpn(currentmesh);
+	KPNewton kpn(currentmesh, verbose);
 	kpn.Tutte();
 	kpn.PrepareDataFree();
-	kpn.RunFree(KPNewton::MIPS);
-	kpn.RunFree(KPNewton::AMIPS);
+	kpn.RunFree(KPNewton::EnergyType::MIPS);
+	kpn.RunFree(KPNewton::EnergyType::AMIPS);
 	kpn.UpdateMesh();
 	double scale = std::sqrt(MeshTools::Area(remesh) / MeshTools::Area(currentmesh));
-	for (const auto & vh : currentmesh.vertices())
+	for (const auto& vh : currentmesh.vertices())
 	{
 		currentmesh.point(vh) *= scale;
 	}
@@ -112,7 +111,7 @@ bool CutClosedMesh::Parameterization(void)
 std::vector<int> CutClosedMesh::FindOrginalVertexIndex(const std::vector<int>& landmarks) const
 {
 	std::set<int> orilandmarks;
-	for (const auto & id : landmarks)
+	for (const auto& id : landmarks)
 	{
 		orilandmarks.insert(originalvid[id]);
 	}
@@ -125,16 +124,20 @@ std::vector<std::pair<int, int>> CutClosedMesh::VoteLandmarks(const std::vector<
 	std::map<int, int> counter;
 	for (size_t i = 0; i < intermediatelandmarks.size(); i++)
 	{
-		for (const auto & k : intermediatelandmarks[i])
+		for (const auto& k : intermediatelandmarks[i])
 		{
-			if (counter.find(k) == counter.end())
+			std::map<int, int>::iterator iter;
+			if ((iter = counter.find(k)) == counter.end())
 			{
-				counter[k] = 0;
+				counter.emplace(k, 1);
 			}
-			counter[k]++;
+			else
+			{
+				++iter->second;
+			}
 		}
 	}
-	for (const auto & c : counter)
+	for (const auto& c : counter)
 	{
 		if (c.second > nvoting)
 		{
@@ -147,7 +150,7 @@ std::vector<std::pair<int, int>> CutClosedMesh::VoteLandmarks(const std::vector<
 std::vector<int> CutClosedMesh::RemoveNearbyLandmarks(const std::vector<std::pair<int, int>>& landmarkwithvote) const
 {
 	std::map<int, int> landmarkset;
-	for (const auto & l : landmarkwithvote)
+	for (const auto& l : landmarkwithvote)
 	{
 		bool bfound = false;
 		std::set<int> neighborvertices;
@@ -157,9 +160,9 @@ std::vector<int> CutClosedMesh::RemoveNearbyLandmarks(const std::vector<std::pai
 		for (int j = 0; j < npost; j++)
 		{
 			std::vector<int> newonering;
-			for (const auto & vid : onering)
+			for (const auto& vid : onering)
 			{
-				for (const auto & vvh : remesh.vv_range(remesh.vertex_handle(vid)))
+				for (const auto& vvh : remesh.vv_range(remesh.vertex_handle(vid)))
 				{
 					if (neighborvertices.find(vvh.idx()) == neighborvertices.end())
 					{
@@ -188,14 +191,14 @@ std::vector<int> CutClosedMesh::RemoveNearbyLandmarks(const std::vector<std::pai
 		}
 	}
 	std::vector<int> landmarks;
-	for (const auto & l : landmarkset)
+	for (const auto& l : landmarkset)
 	{
 		landmarks.push_back(l.first);
 	}
 	return landmarks;
 }
 
-bool CutClosedMesh::SaveCuts(const std::string & filename, const std::vector<int>& iscutvertices, const std::vector<int>& iscutedges)
+bool CutClosedMesh::SaveCuts(const std::string& filename, const std::vector<int>& iscutvertices, const std::vector<int>& iscutedges)
 {
 	std::ofstream ofs(filename);
 	if (!ofs.is_open())
@@ -223,7 +226,7 @@ bool CutClosedMesh::SaveCuts(const std::string & filename, const std::vector<int
 	return true;
 }
 
-bool CutClosedMesh::SaveLandmarks(const std::string & filename, const std::vector<int>& landmarks)
+bool CutClosedMesh::SaveLandmarks(const std::string& filename, const std::vector<int>& landmarks)
 {
 	std::ofstream ofs(filename);
 	if (!ofs.is_open())
@@ -231,7 +234,7 @@ bool CutClosedMesh::SaveLandmarks(const std::string & filename, const std::vecto
 		std::cerr << "Error: cannot save landmarks to " << filename << std::endl;
 		return false;
 	}
-	for (const auto & l : landmarks)
+	for (const auto& l : landmarks)
 	{
 		ofs << l << std::endl;
 	}

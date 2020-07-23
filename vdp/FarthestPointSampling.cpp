@@ -1,7 +1,7 @@
 #include "FarthestPointSampling.h"
 #include "ShortestPath.h"
 
-FarthestPointSampling::FarthestPointSampling(const Mesh & m, const bool & geodesic)
+FarthestPointSampling::FarthestPointSampling(const Mesh& m, const bool& geodesic)
 	:mesh(m),
 	isgeodesic(geodesic)
 {
@@ -15,7 +15,7 @@ FarthestPointSampling::~FarthestPointSampling()
 {
 }
 
-std::vector<int> FarthestPointSampling::ComputeSamples(const int & nsample) const
+std::vector<int> FarthestPointSampling::ComputeSamples(const int& nsample) const
 {
 	std::vector<int> selectpts;
 	std::vector<std::vector<double>> selectdistance;
@@ -41,9 +41,9 @@ std::vector<int> FarthestPointSampling::ComputeSamples(const int & nsample) cons
 	return selectpts;
 }
 
-double FarthestPointSampling::PointSetDistance(const int & vid, const std::vector<std::vector<double>> & distanceset) const
+double FarthestPointSampling::PointSetDistance(const int& vid, const std::vector<std::vector<double>>& distanceset) const
 {
-	const auto & p = mesh.point(mesh.vertex_handle(vid));
+	const auto& p = mesh.point(mesh.vertex_handle(vid));
 	double dist = DBL_MAX;
 	for (size_t i = 0; i < distanceset.size(); i++)
 	{
@@ -53,22 +53,22 @@ double FarthestPointSampling::PointSetDistance(const int & vid, const std::vecto
 	return dist;
 }
 
-std::vector<double> FarthestPointSampling::AllVerticesDistance(const int & vid) const
+std::vector<double> FarthestPointSampling::AllVerticesDistance(const int& vid) const
 {
-	const auto & p = mesh.point(mesh.vertex_handle(vid));
+	const auto& p = mesh.point(mesh.vertex_handle(vid));
 	std::vector<double> dist;
 	dist.reserve(mesh.n_vertices());
 	if (isgeodesic)
 	{
 		shortestpath->Compute(vid, std::vector<int>(mesh.n_vertices(), 1), {}, (int)mesh.n_vertices());
-		for (const auto & vh : mesh.vertices())
+		for (const auto& vh : mesh.vertices())
 		{
 			dist.push_back(shortestpath->GetLength(vh.idx()));
 		}
 	}
 	else
 	{
-		for (const auto & vh : mesh.vertices())
+		for (const auto& vh : mesh.vertices())
 		{
 			dist.push_back((mesh.point(vh) - p).length());
 		}

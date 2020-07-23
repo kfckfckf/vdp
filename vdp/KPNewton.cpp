@@ -3,15 +3,16 @@
 #include <iostream>
 #include <unordered_map>
 
-KPNewton::KPNewton(Mesh & m)
+KPNewton::KPNewton(Mesh& m, bool verbose)
 	:mesh(m),
-	isbv(m.n_vertices(), 0)
+	isbv(m.n_vertices(), 0),
+	verbose(verbose)
 {
 	if (!solver.Init(-2))
 	{
 		std::cerr << "Pardiso initialization failed." << std::endl;
 	}
-	for (const auto & heh : mesh.halfedges())
+	for (const auto& heh : mesh.halfedges())
 	{
 		if (mesh.is_boundary(heh))
 		{
@@ -32,14 +33,14 @@ KPNewton::~KPNewton(void)
 
 void KPNewton::PrepareData(void)
 {
-	auto && ia = solver.ia;
-	auto && ja = solver.ja;
+	auto&& ia = solver.RowIndex();
+	auto&& ja = solver.Columns();
 	int nv = static_cast<int>(mesh.n_vertices());
 	ia.clear();
 	ja.clear();
 	ia.reserve(2 * nv + 1);
 	ja.reserve(16 * nv);
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		ia.push_back(static_cast<int>(ja.size()) + 1);
 		auto vid = vh.idx();
@@ -52,7 +53,7 @@ void KPNewton::PrepareData(void)
 			std::vector<int> rowid;
 			rowid.push_back(vid + 1);
 			rowid.push_back(vid + nv + 1);
-			for (const auto & vvh : mesh.vv_range(vh))
+			for (const auto& vvh : mesh.vv_range(vh))
 			{
 				int vvid = vvh.idx();
 				if (!mesh.is_boundary(vvh))
@@ -65,13 +66,13 @@ void KPNewton::PrepareData(void)
 				}
 			}
 			std::sort(rowid.begin(), rowid.end(), std::less<int>());
-			for (const auto & id : rowid)
+			for (const auto& id : rowid)
 			{
 				ja.push_back(id);
 			}
 		}
 	}
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		ia.push_back(static_cast<int>(ja.size()) + 1);
 		auto vid = vh.idx();
@@ -83,7 +84,7 @@ void KPNewton::PrepareData(void)
 		{
 			std::vector<int> rowid;
 			rowid.push_back(vid + nv + 1);
-			for (const auto & vvh : mesh.vv_range(vh))
+			for (const auto& vvh : mesh.vv_range(vh))
 			{
 				int vvid = vvh.idx();
 				if (!mesh.is_boundary(vvh))
@@ -95,15 +96,15 @@ void KPNewton::PrepareData(void)
 				}
 			}
 			std::sort(rowid.begin(), rowid.end(), std::less<int>());
-			for (const auto & id : rowid)
+			for (const auto& id : rowid)
 			{
 				ja.push_back(id);
 			}
 		}
 	}
 	ia.push_back(static_cast<int>(ja.size()) + 1);
-	solver.a.resize(ja.size());
-	solver.nrow = static_cast<int>(2 * mesh.n_vertices());
+	solver.MatrixValues().resize(ja.size());
+	//solver.nrow = static_cast<int>(2 * mesh.n_vertices());
 	if (!solver.AnalyzePattern())
 	{
 		std::cerr << "Pardiso analyze pattern failed." << std::endl;
@@ -119,10 +120,10 @@ void KPNewton::PrepareData(void)
 		}
 	}
 	tri.resize(mesh.n_faces());
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		auto fid = fh.idx();
-		for (const auto & fvh : mesh.fv_range(fh))
+		for (const auto& fvh : mesh.fv_range(fh))
 		{
 			tri[fid].push_back(fvh.idx());
 		}
@@ -130,7 +131,7 @@ void KPNewton::PrepareData(void)
 	assembleorder.clear();
 	for (size_t fid = 0; fid < tri.size(); fid++)
 	{
-		const auto & vhs = tri[fid];
+		const auto& vhs = tri[fid];
 		for (int i = 0; i < 3; i++)
 		{
 			for (int j = 0; j < 3; j++)
@@ -157,7 +158,7 @@ void KPNewton::PrepareData(void)
 	}
 }
 
-void KPNewton::Run(const EnergyType & etype)
+void KPNewton::Run(const EnergyType& etype)
 {
 	auto maxiter = 100;
 	double Iscale = 1e-8;
@@ -168,11 +169,11 @@ void KPNewton::Run(const EnergyType & etype)
 	{
 	default:
 		break;
-	case MIPS:
+	case EnergyType::MIPS:
 		computeall = ComputeMIPS;
 		computeenergy = ComputeEnergyMIPS;
 		break;
-	case AMIPS:
+	case EnergyType::AMIPS:
 		computeall = ComputeAMIPS;
 		computeenergy = ComputeEnergyAMIPS;
 		break;
@@ -194,7 +195,7 @@ void KPNewton::Run(const EnergyType & etype)
 	double totalarea = 0;
 	for (size_t i = 0; i < nF; i++)
 	{
-		auto && frame = localframe[i];
+		auto&& frame = localframe[i];
 		frame[1] = std::sqrt(faceElens[i][2]);
 		frame[2] = std::polar(std::sqrt(faceElens[i][1]), faceAngles[i][0]);
 		area[i] = frame[1].real() * frame[2].imag() / 2;
@@ -206,15 +207,15 @@ void KPNewton::Run(const EnergyType & etype)
 		D[i][1] = std::conj(DC[i][1]);
 		D[i][2] = std::conj(DC[i][2]);
 	}
-	for (auto && a : area)
+	for (auto&& a : area)
 	{
 		a /= totalarea;
 	}
 	for (int iter = 0; iter < maxiter; iter++)
 	{
-		auto && a = solver.a;
+		auto&& a = solver.MatrixValues();
 		a.clear();
-		a.resize(solver.ja.size(), 0);
+		a.resize(solver.Columns().size(), 0);
 		double e = 0;
 		StdVectord g(2 * nV, 0);
 		StdVectord b(2 * nV, 0);
@@ -222,7 +223,7 @@ void KPNewton::Run(const EnergyType & etype)
 		for (size_t fid = 0; fid < tri.size(); fid++)
 		{
 			std::complex<double> fz, fzb;
-			const auto & vhs = tri[fid];
+			const auto& vhs = tri[fid];
 			for (size_t i = 0; i < 3; i++)
 			{
 				fz += D[fid][i] * result[vhs[i]];
@@ -372,7 +373,13 @@ void KPNewton::Run(const EnergyType & etype)
 			}
 			newEnergy = ComputeEnergy(newpos, D, DC, area);
 		}
-		printf("%3d, step: %.6e, xnorm: %.6e, eg: %.6e, e: %3.6f, newe: %3.6f\n", iter, lsa, stepDirlen, energyGrad, e, newEnergy);
+		if (verbose)
+		{
+			std::cout.setf(std::ios::fixed);
+			std::cout << iter << ", step: " << lsa << ", \txnorm: " << stepDirlen << ", \tgrad: " << energyGrad << ", \te: " << e << ", \tnewe: " << newEnergy << "\n";
+			std::cout.unsetf(std::ios::fixed);
+		}
+		
 		if (newEnergy > e || std::isnan(newEnergy) || std::isinf(newEnergy))
 		{
 			//std::cout << "Error!" << std::endl;
@@ -393,21 +400,21 @@ void KPNewton::Run(const EnergyType & etype)
 
 void KPNewton::PrepareDataFree(void)
 {
-	auto && ia = solver.ia;
-	auto && ja = solver.ja;
+	auto&& ia = solver.RowIndex();
+	auto&& ja = solver.Columns();
 	int nv = static_cast<int>(mesh.n_vertices());
 	ia.clear();
 	ja.clear();
 	ia.reserve(2 * nv + 1);
 	ja.reserve(16 * nv);
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		ia.push_back(static_cast<int>(ja.size()) + 1);
 		auto vid = vh.idx();
 		std::vector<int> rowid;
 		rowid.push_back(vid + 1);
 		rowid.push_back(vid + nv + 1);
-		for (const auto & vvh : mesh.vv_range(vh))
+		for (const auto& vvh : mesh.vv_range(vh))
 		{
 			int vvid = vvh.idx();
 			if (vvid > vid)
@@ -417,18 +424,18 @@ void KPNewton::PrepareDataFree(void)
 			rowid.push_back(vvid + nv + 1);
 		}
 		std::sort(rowid.begin(), rowid.end(), std::less<int>());
-		for (const auto & id : rowid)
+		for (const auto& id : rowid)
 		{
 			ja.push_back(id);
 		}
 	}
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		ia.push_back(static_cast<int>(ja.size()) + 1);
 		auto vid = vh.idx();
 		std::vector<int> rowid;
 		rowid.push_back(vid + nv + 1);
-		for (const auto & vvh : mesh.vv_range(vh))
+		for (const auto& vvh : mesh.vv_range(vh))
 		{
 			int vvid = vvh.idx();
 			if (vvid > vid)
@@ -437,14 +444,14 @@ void KPNewton::PrepareDataFree(void)
 			}
 		}
 		std::sort(rowid.begin(), rowid.end(), std::less<int>());
-		for (const auto & id : rowid)
+		for (const auto& id : rowid)
 		{
 			ja.push_back(id);
 		}
 	}
 	ia.push_back(static_cast<int>(ja.size()) + 1);
-	solver.a.resize(ja.size());
-	solver.nrow = static_cast<int>(2 * mesh.n_vertices());
+	solver.MatrixValues().resize(ja.size());
+	//solver.nrow = static_cast<int>(2 * mesh.n_vertices());
 	if (!solver.AnalyzePattern())
 	{
 		std::cerr << "Pardiso analyze pattern failed." << std::endl;
@@ -460,10 +467,10 @@ void KPNewton::PrepareDataFree(void)
 		}
 	}
 	tri.resize(mesh.n_faces());
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		auto fid = fh.idx();
-		for (const auto & fvh : mesh.fv_range(fh))
+		for (const auto& fvh : mesh.fv_range(fh))
 		{
 			tri[fid].push_back(fvh.idx());
 		}
@@ -471,7 +478,7 @@ void KPNewton::PrepareDataFree(void)
 	assembleorder.clear();
 	for (size_t fid = 0; fid < tri.size(); fid++)
 	{
-		const auto & vhs = tri[fid];
+		const auto& vhs = tri[fid];
 		for (int i = 0; i < 3; i++)
 		{
 			for (int j = 0; j < 3; j++)
@@ -487,7 +494,7 @@ void KPNewton::PrepareDataFree(void)
 	}
 }
 
-void KPNewton::RunFree(const EnergyType & etype)
+void KPNewton::RunFree(const EnergyType& etype)
 {
 	auto maxiter = 100;
 	double Iscale = 1e-8;
@@ -498,11 +505,11 @@ void KPNewton::RunFree(const EnergyType & etype)
 	{
 	default:
 		break;
-	case MIPS:
+	case EnergyType::MIPS:
 		computeall = ComputeMIPS;
 		computeenergy = ComputeEnergyMIPS;
 		break;
-	case AMIPS:
+	case EnergyType::AMIPS:
 		computeall = ComputeAMIPS;
 		computeenergy = ComputeEnergyAMIPS;
 		break;
@@ -525,7 +532,7 @@ void KPNewton::RunFree(const EnergyType & etype)
 	double totalarea = 0;
 	for (size_t i = 0; i < nF; i++)
 	{
-		auto && frame = localframe[i];
+		auto&& frame = localframe[i];
 		frame[1] = std::sqrt(faceElens[i][2]);
 		frame[2] = std::polar(std::sqrt(faceElens[i][1]), faceAngles[i][0]);
 		area[i] = frame[1].real() * frame[2].imag() / 2;
@@ -537,15 +544,15 @@ void KPNewton::RunFree(const EnergyType & etype)
 		D[i][1] = std::conj(DC[i][1]);
 		D[i][2] = std::conj(DC[i][2]);
 	}
-	for (auto && a : area)
+	for (auto&& a : area)
 	{
 		a /= totalarea;
 	}
 	for (int iter = 0; iter < maxiter; iter++)
 	{
-		auto && a = solver.a;
+		auto&& a = solver.MatrixValues();
 		a.clear();
-		a.resize(solver.ja.size(), 0);
+		a.resize(solver.Columns().size(), 0);
 		double e = 0;
 		StdVectord g(2 * nV, 0);
 		StdVectord b(2 * nV, 0);
@@ -553,7 +560,7 @@ void KPNewton::RunFree(const EnergyType & etype)
 		for (size_t fid = 0; fid < tri.size(); fid++)
 		{
 			std::complex<double> fz, fzb;
-			const auto & vhs = tri[fid];
+			const auto& vhs = tri[fid];
 			for (size_t i = 0; i < 3; i++)
 			{
 				fz += D[fid][i] * result[vhs[i]];
@@ -681,8 +688,12 @@ void KPNewton::RunFree(const EnergyType & etype)
 			}
 			newEnergy = ComputeEnergy(newpos, D, DC, area);
 		}
-		printf("%3d, step: %.6e, xnorm: %.6e, eg: %.6e, e: %3.6f, newe: %3.6f\n", iter, lsa, stepDirlen, energyGrad, e, newEnergy);
-		//std::cout << iter << ' ' << lsa << ' ' << stepDirlen << ' ' << e << ' ' << energyGrad << ' ' << newEnergy << std::endl;
+		if (verbose)
+		{
+			std::cout.setf(std::ios::fixed);
+			std::cout << iter << ", step: " << lsa << ", \txnorm: " << stepDirlen << ", \tgrad: " << energyGrad << ", \te: " << e << ", \tnewe: " << newEnergy << "\n";
+			std::cout.unsetf(std::ios::fixed);
+		}
 		if (newEnergy > e || std::isnan(newEnergy) || std::isinf(newEnergy))
 		{
 			//std::cout << "Error!" << std::endl;
@@ -703,7 +714,10 @@ void KPNewton::RunFree(const EnergyType & etype)
 
 void KPNewton::Tutte(void)
 {
-	std::cout << "Tutte start ... ";
+	if (verbose)
+	{
+		std::cout << "Tutte start ... ";
+	}
 	auto boundaryvhs = GetBoundary();
 
 	double delta_angle = 2 * M_PI / boundaryvhs.size();
@@ -716,9 +730,9 @@ void KPNewton::Tutte(void)
 		posy[boundaryvhs[i].idx()] = area_1_factor * sin(i * delta_angle);
 	}
 
-	auto && pardiso_it = solver.ia;
-	auto && pardiso_jt = solver.ja;
-	auto && pardiso_t = solver.a;
+	auto&& pardiso_it = solver.RowIndex();
+	auto&& pardiso_jt = solver.Columns();
+	auto&& pardiso_t = solver.MatrixValues();
 	std::vector<double> pardiso_tu;
 	std::vector<double> pardiso_tv;
 
@@ -727,7 +741,7 @@ void KPNewton::Tutte(void)
 	pardiso_t.reserve(6 * nv);
 	pardiso_tu.resize(nv, 0.0);
 	pardiso_tv.resize(nv, 0.0);
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		pardiso_it.push_back(static_cast<int>(pardiso_jt.size()) + 1);
 		auto vid = vh.idx();
@@ -744,7 +758,7 @@ void KPNewton::Tutte(void)
 			pardiso_t.push_back(mesh.valence(vh));
 			std::vector<int> row_id;
 			row_id.reserve(mesh.valence(vh));
-			for (const auto & vvh : mesh.vv_range(vh))
+			for (const auto& vvh : mesh.vv_range(vh))
 			{
 				int vvid = vvh.idx();
 				if (mesh.is_boundary(vvh))
@@ -769,7 +783,7 @@ void KPNewton::Tutte(void)
 		}
 	}
 	pardiso_it.push_back(static_cast<int>(pardiso_jt.size()) + 1);
-	solver.nrow = static_cast<int>(nv);
+	//solver.nrow = static_cast<int>(nv);
 	if (!solver.AnalyzePattern())
 	{
 		std::cerr << "Pardiso analyze pattern ... failed." << std::endl;
@@ -797,10 +811,13 @@ void KPNewton::Tutte(void)
 		result.push_back({ posx[i], posy[i] });
 	}
 	//UpdateMesh();
-	std::cout << "finished!" << std::endl;
+	if (verbose)
+	{
+		std::cout << "finished!" << std::endl;
+	}
 }
 
-void KPNewton::LoadInitial(const std::string & filename)
+void KPNewton::LoadInitial(const std::string& filename)
 {
 	std::ifstream ifs(filename);
 	if (!ifs.is_open())
@@ -852,7 +869,7 @@ void KPNewton::LoadInitial(const std::string & filename)
 std::vector<Mesh::VertexHandle> KPNewton::GetBoundary(void) const
 {
 	std::vector<Mesh::VertexHandle> vhs;
-	for (const auto & heh : mesh.halfedges())
+	for (const auto& heh : mesh.halfedges())
 	{
 		if (mesh.is_boundary(heh))
 		{
@@ -872,24 +889,24 @@ KPNewton::StdMatrixd KPNewton::MeshFaceEdgeLen2s(void) const
 {
 	StdMatrixd len;
 	len.reserve(mesh.n_faces());
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		auto fvit = mesh.fv_iter(fh);
-		const auto & p0 = mesh.point(*fvit);
+		const auto& p0 = mesh.point(*fvit);
 		fvit++;
-		const auto & p1 = mesh.point(*fvit);
+		const auto& p1 = mesh.point(*fvit);
 		fvit++;
-		const auto & p2 = mesh.point(*fvit);
+		const auto& p2 = mesh.point(*fvit);
 		len.push_back({ (p2 - p1).sqrnorm(), (p0 - p2).sqrnorm(), (p1 - p0).sqrnorm() });
 	}
 	return len;
 }
 
-KPNewton::StdMatrixd KPNewton::MeshAnglesFromFaceEdgeLen2(const StdMatrixd & len2) const
+KPNewton::StdMatrixd KPNewton::MeshAnglesFromFaceEdgeLen2(const StdMatrixd& len2) const
 {
 	StdMatrixd ang;
 	ang.reserve(len2.size());
-	for (const auto & fel : len2) // cos(a) = (b^2 + c^2 - a^2) / sqrt(bc) / 2
+	for (const auto& fel : len2) // cos(a) = (b^2 + c^2 - a^2) / sqrt(bc) / 2
 	{
 		ang.push_back({
 			std::acos((fel[1] + fel[2] - fel[0]) / std::sqrt(fel[1] * fel[2]) / 2.0),
@@ -900,7 +917,7 @@ KPNewton::StdMatrixd KPNewton::MeshAnglesFromFaceEdgeLen2(const StdMatrixd & len
 	return ang;
 }
 
-double KPNewton::ComputeEnergy(const StdVectorcd & pos, const StdMatrixcd & D, const StdMatrixcd & DC, const StdVectord & area) const
+double KPNewton::ComputeEnergy(const StdVectorcd& pos, const StdMatrixcd& D, const StdMatrixcd& DC, const StdVectord& area) const
 {
 	double energy = 0;
 	for (size_t fid = 0; fid < tri.size(); fid++)
@@ -920,28 +937,28 @@ double KPNewton::ComputeEnergy(const StdVectorcd & pos, const StdMatrixcd & D, c
 	return energy;
 }
 
-double KPNewton::ComputeTMax(const StdVectorcd & x, const StdVectorcd & d) const
+double KPNewton::ComputeTMax(const StdVectorcd& x, const StdVectorcd& d) const
 {
 	double temp_t = std::numeric_limits<double>::infinity();
 	double a, b, c, b1, b2, tt, tt1, tt2;
 	int V_N = (int)mesh.n_vertices();
-	for (const auto & f : tri)
+	for (const auto& f : tri)
 	{
-		const auto & f0 = f[0];
-		const auto & f1 = f[1];
-		const auto & f2 = f[2];
-		const auto & x0 = x[f0].real();
-		const auto & x1 = x[f1].real();
-		const auto & x2 = x[f2].real();
-		const auto & x3 = x[f0].imag();
-		const auto & x4 = x[f1].imag();
-		const auto & x5 = x[f2].imag();
-		const auto & d0 = d[f0].real();
-		const auto & d1 = d[f1].real();
-		const auto & d2 = d[f2].real();
-		const auto & d3 = d[f0].imag();
-		const auto & d4 = d[f1].imag();
-		const auto & d5 = d[f2].imag();
+		const auto& f0 = f[0];
+		const auto& f1 = f[1];
+		const auto& f2 = f[2];
+		const auto& x0 = x[f0].real();
+		const auto& x1 = x[f1].real();
+		const auto& x2 = x[f2].real();
+		const auto& x3 = x[f0].imag();
+		const auto& x4 = x[f1].imag();
+		const auto& x5 = x[f2].imag();
+		const auto& d0 = d[f0].real();
+		const auto& d1 = d[f1].real();
+		const auto& d2 = d[f2].real();
+		const auto& d3 = d[f0].imag();
+		const auto& d4 = d[f1].imag();
+		const auto& d5 = d[f2].imag();
 
 		a = (d1 - d0) * (d5 - d3) - (d4 - d3) * (d2 - d0);
 		b1 = (d1 - d0) * (x5 - x3) + (x1 - x0) * (d5 - d3);
@@ -950,10 +967,10 @@ double KPNewton::ComputeTMax(const StdVectorcd & x, const StdVectorcd & d) const
 		c = (x1 - x0) * (x5 - x3) - (x4 - x3) * (x2 - x0);
 		tt = std::numeric_limits<double>::infinity();
 		//tt = 10000;
-		if (b*b - 4 * a*c >= 0)
+		if (b * b - 4 * a * c >= 0)
 		{
-			tt1 = 1 / (2 * a) * (-b + sqrt(b*b - 4 * a*c));
-			tt2 = 1 / (2 * a) * (-b - sqrt(b*b - 4 * a*c));
+			tt1 = 1 / (2 * a) * (-b + sqrt(b * b - 4 * a * c));
+			tt2 = 1 / (2 * a) * (-b - sqrt(b * b - 4 * a * c));
 			if (tt1 > 0 && tt2 > 0)
 			{
 				tt = std::min(tt1, tt2);
@@ -978,13 +995,13 @@ double KPNewton::ComputeTMax(const StdVectorcd & x, const StdVectorcd & d) const
 
 void KPNewton::UpdateMesh(void)
 {
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		mesh.set_point(vh, { result[vh.idx()].real(), result[vh.idx()].imag(), 0.0 });
 	}
 }
 
-void KPNewton::ComputeMIPS(double & energy, double & alpha1, double & alpha2, double & beta1, double & beta2, double & beta3, const double & x, const double & y)
+void KPNewton::ComputeMIPS(double& energy, double& alpha1, double& alpha2, double& beta1, double& beta2, double& beta3, const double& x, const double& y)
 {
 	energy = (x + y) / (x - y);
 	alpha1 = -2 * y / (x - y) / (x - y);
@@ -994,7 +1011,7 @@ void KPNewton::ComputeMIPS(double & energy, double & alpha1, double & alpha2, do
 	beta3 = (alpha1 - alpha2) / (x - y);
 }
 
-void KPNewton::ComputeAMIPS(double & energy, double & alpha1, double & alpha2, double & beta1, double & beta2, double & beta3, const double & x, const double & y)
+void KPNewton::ComputeAMIPS(double& energy, double& alpha1, double& alpha2, double& beta1, double& beta2, double& beta3, const double& x, const double& y)
 {
 	energy = std::exp((x + y) / (x - y));
 	alpha1 = -2 * y / (x - y) / (x - y) * energy;
@@ -1004,12 +1021,12 @@ void KPNewton::ComputeAMIPS(double & energy, double & alpha1, double & alpha2, d
 	beta3 = ((2 * x - y) * alpha1 - x * alpha2) / (x - y) / (x - y);
 }
 
-double KPNewton::ComputeEnergyMIPS(const double & x, const double & y)
+double KPNewton::ComputeEnergyMIPS(const double& x, const double& y)
 {
 	return (x + y) / (x - y);
 }
 
-double KPNewton::ComputeEnergyAMIPS(const double & x, const double & y)
+double KPNewton::ComputeEnergyAMIPS(const double& x, const double& y)
 {
 	return std::exp((x + y) / (x - y));
 }

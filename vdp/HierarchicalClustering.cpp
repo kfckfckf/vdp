@@ -2,7 +2,7 @@
 #include <set>
 #include <list>
 
-HierarchicalClustering::HierarchicalClustering(const Mesh & m)
+HierarchicalClustering::HierarchicalClustering(const Mesh& m)
 	:mesh(m),
 	isfirstclustering(true)
 {
@@ -13,7 +13,7 @@ HierarchicalClustering::~HierarchicalClustering(void)
 {
 }
 
-void HierarchicalClustering::ComputeDistortion(const Mesh & mesh2)
+void HierarchicalClustering::ComputeDistortion(const Mesh& mesh2)
 {
 	double alpha = 0.5;
 	if (mesh2.n_faces() != mesh.n_faces())
@@ -21,13 +21,13 @@ void HierarchicalClustering::ComputeDistortion(const Mesh & mesh2)
 		return;
 	}
 	facedistortion.resize(mesh.n_faces());
-	for (const auto & fh : mesh2.faces())
+	for (const auto& fh : mesh2.faces())
 	{
 		auto fid = fh.idx();
 		auto heh = mesh2.halfedge_handle(fh);
-		const auto & p0 = mesh2.point(mesh2.from_vertex_handle(heh));
-		const auto & p1 = mesh2.point(mesh2.to_vertex_handle(heh));
-		const auto & p2 = mesh2.point(mesh2.to_vertex_handle(mesh2.next_halfedge_handle(heh)));
+		const auto& p0 = mesh2.point(mesh2.from_vertex_handle(heh));
+		const auto& p1 = mesh2.point(mesh2.to_vertex_handle(heh));
+		const auto& p2 = mesh2.point(mesh2.to_vertex_handle(mesh2.next_halfedge_handle(heh)));
 		auto np = (p1 - p0) % (p2 - p0);
 		double area = np.norm() * 0.5;
 		np.normalize();
@@ -53,7 +53,7 @@ void HierarchicalClustering::ComputeDistortion(const Mesh & mesh2)
 	}
 }
 
-void HierarchicalClustering::ComputeClusters(const int & size, const bool & usefirst)
+void HierarchicalClustering::ComputeClusters(const int& size, const bool& usefirst)
 {
 	std::vector<int> dataset;
 	for (int i = 0; i < facedistortion.size(); i++)
@@ -69,17 +69,17 @@ void HierarchicalClustering::ComputeClusters(const int & size, const bool & usef
 	ClusterRecursively(dataset, size);
 }
 
-void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
+void HierarchicalClustering::ComputeClustersPersistence(const double& tau)
 {
 	// Step 1: compute a point wise function
 	std::vector<double> vertdis(mesh.n_vertices());
 	std::vector<int> v2v(mesh.n_vertices());
 	std::vector<int> v2vi(mesh.n_vertices());
-	for (const auto & vh : mesh.vertices())
+	for (const auto& vh : mesh.vertices())
 	{
 		double vdis = 0.0;
 		double varea = 0.0;
-		for (const auto & vfh : mesh.vf_range(vh))
+		for (const auto& vfh : mesh.vf_range(vh))
 		{
 			vdis += facearea[vfh.idx()] * facedistortion[vfh.idx()];
 			varea += facearea[vfh.idx()];
@@ -90,9 +90,9 @@ void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
 	}
 
 	// Step 2: sort the vertices
-	std::sort(v2v.begin(), v2v.end(), [&vertdis](const auto &vv1, const auto &vv2) {
+	std::sort(v2v.begin(), v2v.end(), [&vertdis](const auto& vv1, const auto& vv2) {
 		return vertdis[vv1] > vertdis[vv2];
-	});
+		});
 	for (size_t i = 0; i < v2v.size(); i++)
 	{
 		v2vi[v2v[i]] = static_cast<int>(i);
@@ -105,7 +105,7 @@ void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
 	{
 		// Step 3.1: compute higher neighbor vertices
 		std::vector<int> nei;
-		for (const auto & vvh : mesh.vv_range(mesh.vertex_handle(v2v[i])))
+		for (const auto& vvh : mesh.vv_range(mesh.vertex_handle(v2v[i])))
 		{
 			if (v2vi[vvh.idx()] < i)
 			{
@@ -124,7 +124,7 @@ void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
 			// vertex i is not a peak of f within mesh
 			g[i] = nei[0];
 			double maxf = vertdis[v2v[g[i]]];
-			for (const auto & n : nei)
+			for (const auto& n : nei)
 			{
 				if (vertdis[v2v[n]] > maxf)
 				{
@@ -142,7 +142,7 @@ void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
 				}
 			}
 			ei->second.insert(i);
-			for (const auto & j : nei)
+			for (const auto& j : nei)
 			{
 				auto e = U.end();
 				for (auto eit = U.begin(); eit != U.end(); ++eit)
@@ -165,7 +165,7 @@ void HierarchicalClustering::ComputeClustersPersistence(const double & tau)
 		}
 	}
 	featurepoints.clear();
-	for (const auto & e : U)
+	for (const auto& e : U)
 	{
 		featurepoints.push_back(v2v[e.first]);
 	}
@@ -177,12 +177,12 @@ void HierarchicalClustering::PrepareComputeDistortion(void)
 	fpx1.resize(mesh.n_faces());
 	fpx2.resize(mesh.n_faces());
 	fpy2.resize(mesh.n_faces());
-	for (const auto & fh : mesh.faces())
+	for (const auto& fh : mesh.faces())
 	{
 		auto heh = mesh.halfedge_handle(fh);
-		const auto & p0 = mesh.point(mesh.from_vertex_handle(heh));
-		const auto & p1 = mesh.point(mesh.to_vertex_handle(heh));
-		const auto & p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(heh)));
+		const auto& p0 = mesh.point(mesh.from_vertex_handle(heh));
+		const auto& p1 = mesh.point(mesh.to_vertex_handle(heh));
+		const auto& p2 = mesh.point(mesh.to_vertex_handle(mesh.next_halfedge_handle(heh)));
 		auto np = (p1 - p0) % (p2 - p0);
 		double area = np.norm() * 0.5;
 		np.normalize();
@@ -195,14 +195,14 @@ void HierarchicalClustering::PrepareComputeDistortion(void)
 	}
 }
 
-void HierarchicalClustering::ClusterRecursively(const std::vector<int>& dataset, const double & threshold)
+void HierarchicalClustering::ClusterRecursively(const std::vector<int>& dataset, const double& threshold)
 {
 	std::vector<std::vector<int>> regions = ComputeConnectedRegions(dataset, threshold);
-	for (const auto & r : regions)
+	for (const auto& r : regions)
 	{
 		AddFeaturePointInRegion(r);
 	}
-	for (const auto & r : regions)
+	for (const auto& r : regions)
 	{
 		std::vector<int> d_s;
 		if (isfirstclustering)
@@ -221,15 +221,15 @@ void HierarchicalClustering::ClusterRecursively(const std::vector<int>& dataset,
 	}
 }
 
-std::vector<std::vector<int>> HierarchicalClustering::ClusterOnce(const std::vector<int>& dataset, const double & threshold)
+std::vector<std::vector<int>> HierarchicalClustering::ClusterOnce(const std::vector<int>& dataset, const double& threshold)
 {
 	std::vector<std::vector<int>> regions = ComputeConnectedRegions(dataset, threshold);
-	for (const auto & r : regions)
+	for (const auto& r : regions)
 	{
 		AddFeaturePointInRegion(r);
 	}
 	std::vector<std::vector<int>> newdatasets;
-	for (const auto & r : regions)
+	for (const auto& r : regions)
 	{
 		std::vector<int> d_s;
 		if (isfirstclustering)
@@ -249,17 +249,17 @@ std::vector<std::vector<int>> HierarchicalClustering::ClusterOnce(const std::vec
 	return newdatasets;
 }
 
-std::vector<std::vector<int>> HierarchicalClustering::ComputeConnectedRegions(const std::vector<int>& dataset, const double & threshold) const
+std::vector<std::vector<int>> HierarchicalClustering::ComputeConnectedRegions(const std::vector<int>& dataset, const double& threshold) const
 {
 	std::vector<int> isaccessible(mesh.n_faces(), 0);
-	for (const auto & val : dataset)
+	for (const auto& val : dataset)
 	{
 		isaccessible[val] = 1;
 	}
 	std::vector<std::vector<int>> regions;
 	std::vector<int> isfacevisited(mesh.n_faces(), 0);
 	std::vector<int> isvertexvisited(mesh.n_vertices(), 0);
-	for (const auto & fid : dataset)
+	for (const auto& fid : dataset)
 	{
 		if (!isfacevisited[fid])
 		{
@@ -268,12 +268,12 @@ std::vector<std::vector<int>> HierarchicalClustering::ComputeConnectedRegions(co
 			isfacevisited[fid] = 1;
 			for (size_t j = 0; j < r.size(); j++)
 			{
-				for (const auto & fvh : mesh.fv_range(mesh.face_handle(r[j])))
+				for (const auto& fvh : mesh.fv_range(mesh.face_handle(r[j])))
 				{
 					if (!isvertexvisited[fvh.idx()])
 					{
 						isvertexvisited[fvh.idx()] = 1;
-						for (const auto & fvheh : mesh.voh_range(fvh))
+						for (const auto& fvheh : mesh.voh_range(fvh))
 						{
 							int fid = mesh.face_handle(fvheh).idx();
 							if (isaccessible[fid] && !isfacevisited[fid])
@@ -298,7 +298,7 @@ void HierarchicalClustering::AddFeaturePointInRegion(const std::vector<int>& reg
 {
 	double fmaxdis = 0.0;
 	int fidmax = 0;
-	for (const auto & fid : region)
+	for (const auto& fid : region)
 	{
 		if (facedistortion[fid] > fmaxdis)
 		{
@@ -312,11 +312,11 @@ void HierarchicalClustering::AddFeaturePointInRegion(const std::vector<int>& reg
 		auto fh = mesh.face_handle(fidmax);
 		int vid = 0;
 		double vmaxdis = 0.0;
-		for (const auto & fvh : mesh.fv_range(fh))
+		for (const auto& fvh : mesh.fv_range(fh))
 		{
 			double vdis = 0.0;
 			int vvalence = 0;
-			for (const auto & vfh : mesh.vf_range(fvh))
+			for (const auto& vfh : mesh.vf_range(fvh))
 			{
 				vdis += facedistortion[vfh.idx()];
 				++vvalence;
@@ -332,10 +332,10 @@ void HierarchicalClustering::AddFeaturePointInRegion(const std::vector<int>& reg
 	}
 }
 
-std::vector<int> HierarchicalClustering::FilterDis(const std::vector<int>& dataset, const double & filter) const
+std::vector<int> HierarchicalClustering::FilterDis(const std::vector<int>& dataset, const double& filter) const
 {
 	std::vector<int> newdataset;
-	for (const auto & id : dataset)
+	for (const auto& id : dataset)
 	{
 		if (facedistortion[id] > filter)
 		{
@@ -349,7 +349,7 @@ std::vector<int> HierarchicalClustering::FilterMid(const std::vector<int>& datas
 {
 	std::vector<double> tempdistortion;
 	tempdistortion.reserve(dataset.size());
-	for (const auto & id : dataset)
+	for (const auto& id : dataset)
 	{
 		tempdistortion.push_back(facedistortion[id]);
 	}
@@ -360,7 +360,7 @@ std::vector<int> HierarchicalClustering::FilterMid(const std::vector<int>& datas
 std::vector<int> HierarchicalClustering::FilterAvg(const std::vector<int>& dataset) const
 {
 	double avg = 0.0;
-	for (const auto & id : dataset)
+	for (const auto& id : dataset)
 	{
 		avg += facedistortion[id];
 	}
